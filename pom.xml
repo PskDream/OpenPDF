@@ -3,7 +3,7 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.github.librepdf</groupId>
+  <groupId>com.github.pskdream</groupId>
   <artifactId>openpdf-parent</artifactId>
   <version>3.0.1-SNAPSHOT</version> <!-- artifact.version -->
   <packaging>pom</packaging>
@@ -11,7 +11,7 @@
   <!-- please run mvn tidy:pom once in a while -->
   <name>OpenPDF - Free and Open PDF</name>
   <description>Open and Free PDF library.</description>
-  <url>https://github.com/LibrePDF/OpenPDF</url>
+  <url>https://github.com/pskdream/openpdf</url>
 
   <licenses>
     <license>
@@ -40,9 +40,9 @@
   </developers>
 
   <scm>
-    <url>scm:git:https://github.com/LibrePDF/OpenPDF</url>
-    <connection>scm:git:https://github.com/LibrePDF/OpenPDF.git</connection>
-    <developerConnection>scm:git:https://github.com/LibrePDF/OpenPDF.git</developerConnection>
+    <url>scm:git:https://github.com/pskdream/openpdf</url>
+    <connection>scm:git:https://github.com/pskdream/openpdf.git</connection>
+    <developerConnection>scm:git:https://github.com/pskdream/openpdf.git</developerConnection>
   </scm>
 
   <modules>
@@ -56,10 +56,15 @@
   </modules>
   <!-- Distribution config from http://central.sonatype.org/pages/apache-maven.html#distribution-management-and-authentication -->
   <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub PskDream Apache Maven Packages</name>
+      <url>https://maven.pkg.github.com/pskdream/openpdf</url>
+    </repository>
   </distributionManagement>
 
   <properties>
-    <java-module-name>com.github.librepdf.openpdf.parent</java-module-name>
+    <java-module-name>com.github.pskdream.openpdf.parent</java-module-name>
     <java.version>21</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>

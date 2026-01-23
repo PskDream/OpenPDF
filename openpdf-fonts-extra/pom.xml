@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.github.librepdf</groupId>
+    <groupId>com.github.pskdream</groupId>
     <artifactId>openpdf-parent</artifactId>
     <version>3.0.1-SNAPSHOT</version>
   </parent>
@@ -12,12 +12,12 @@
   <name>OpenPDF Fonts Extras</name>
 
   <properties>
-    <java-module-name>com.github.librepdf.pdfFontsExtra</java-module-name>
+    <java-module-name>com.github.pskdream.pdfFontsExtra</java-module-name>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>com.github.librepdf</groupId>
+      <groupId>com.github.pskdream</groupId>
         <artifactId>openpdf</artifactId>
         <version>${project.version}</version>
     </dependency>
