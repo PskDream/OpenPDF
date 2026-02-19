@@ -195,7 +195,7 @@ public class PdfTextExtractor {
 
         renderListener.reset();
         renderListener.setPage(page);
-        PdfContentStreamHandler handler = new PdfContentStreamHandler(renderListener);
+        PdfContentStreamHandler handler = new PdfContentTextExtractor(renderListener);
         processContent(getContentBytesForPage(page), resources, handler);
         return handler.getResultantText();
     }

@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.github.librepdf</groupId>
     <artifactId>openpdf-parent</artifactId>
-    <version>3.0.1-SNAPSHOT</version>
+    <version>3.0.2-SNAPSHOT</version>
   </parent>
 
   <artifactId>openpdf-html</artifactId>
@@ -28,7 +28,7 @@
     <dependency>
       <groupId>org.htmlunit</groupId>
       <artifactId>neko-htmlunit</artifactId>
-      <version>4.17.0</version>
+      <version>4.21.0</version>
     </dependency>
     <dependency>
       <groupId>com.github.librepdf</groupId>
@@ -89,15 +89,31 @@
       <resource>
         <directory>src/main/resources</directory>
       </resource>
-      <resource>
-        <directory>../</directory>
-        <targetPath>META-INF</targetPath>
-        <includes>
-          <include>LICENSE*</include>
-        </includes>
-      </resource>
     </resources>
     <plugins>
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-license</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/META-INF</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/..</directory>
+                  <includes>
+                    <include>LICENSE*</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>

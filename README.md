@@ -3,9 +3,9 @@
 OpenPDF is an open-source Java library for creating, editing, rendering, and encrypting PDF documents, as well as generating PDFs from HTML. It is licensed under the LGPL and MPL open source licenses. 
 We welcome contributions from other developers. Please feel free to submit pull-requests and bug reports to this GitHub repository.
 
-## OpenPDF version 3.0.0 released 2025-08-17
+## OpenPDF version 3.0.1 released 2026-02-18
 
-Get version 3.0.0 here: https://github.com/LibrePDF/OpenPDF/releases/tag/3.0.0 Other versions
+Get version 3.0.1 here: https://github.com/LibrePDF/OpenPDF/releases/tag/3.0.1 Other versions
 
 - [OpenPDF 1.4.2 (release 2024-03-30)](https://github.com/LibrePDF/OpenPDF/releases/tag/1.4.2)
 - [Previous releases](https://github.com/LibrePDF/OpenPDF/releases)
@@ -28,18 +28,17 @@ The features of OpenPDF include:
 * Page Layout: OpenPDF allows you to set the page size, orientation, and other layout properties.
 * PDF 2.0 support (ISO 32000-2).
 
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.librepdf/openpdf/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.librepdf/openpdf)
+[![Maven Central](https://img.shields.io/maven-central/v/com.github.librepdf/openpdf.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.github.librepdf/openpdf)
 ![CI](https://github.com/LibrePDF/OpenPDF/actions/workflows/maven.yml/badge.svg)
 [![License (LGPL version 2.1)](https://img.shields.io/badge/license-GNU%20LGPL%20version%202.1-blue.svg?style=flat-square)](http://opensource.org/licenses/LGPL-2.1)
 [![License (MPL)](https://img.shields.io/badge/license-Mozilla%20Public%20License-yellow.svg?style=flat-square)](http://opensource.org/licenses/MPL-2.0)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/791d40a437f64c77a0a802ae597a960c)](https://app.codacy.com/gh/LibrePDF/OpenPDF/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/791d40a437f64c77a0a802ae597a960c)](https://app.codacy.com/gh/LibrePDF/OpenPDF/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 [![CodeQL](https://github.com/LibrePDF/OpenPDF/actions/workflows/codeql.yml/badge.svg)](https://github.com/LibrePDF/OpenPDF/actions/workflows/codeql.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/librepdf/openpdf/badge)](https://www.codefactor.io/repository/github/librepdf/openpdf)
 [![Join the chat at https://gitter.im/LibrePDF/OpenPDF](https://badges.gitter.im/LibrePDF/OpenPDF.svg)](https://gitter.im/LibrePDF/OpenPDF)
-![Java 17](https://img.shields.io/badge/Java-17-blue?logo=java&logoColor=white)
 ![Java 21](https://img.shields.io/badge/Java-21-blue?logo=java&logoColor=white)
 ![Java 24](https://img.shields.io/badge/Java-24-blue?logo=java&logoColor=yellow)
+![Java 25](https://img.shields.io/badge/Java-25-blue?logo=java&logoColor=blue)
 [![Kotlin](https://img.shields.io/badge/Kotlin-Supported-ADD8E6?logo=kotlin&logoColor=white)](https://github.com/LibrePDF/OpenPDF/tree/master/openpdf-kotlin)
 
 ## Use OpenPDF as Maven dependency
@@ -51,7 +50,7 @@ Add this to your pom.xml file to use the latest version of OpenPDF:
 <dependency>
   <groupId>com.github.librepdf</groupId>
   <artifactId>openpdf</artifactId>
-  <version>3.0.0</version>
+  <version>3.0.1</version>
 </dependency>
 ```
 

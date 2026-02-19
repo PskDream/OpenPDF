@@ -44,9 +44,6 @@ package org.openpdf.text.pdf.parser;
 import org.openpdf.text.ExceptionConverter;
 import org.openpdf.text.error_messages.MessageLocalization;
 import org.openpdf.text.pdf.CMapAwareDocumentFont;
-import org.openpdf.text.pdf.PRIndirectReference;
-import org.openpdf.text.pdf.PRStream;
-import org.openpdf.text.pdf.PRTokeniser;
 import org.openpdf.text.pdf.PdfArray;
 import org.openpdf.text.pdf.PdfContentParser;
 import org.openpdf.text.pdf.PdfDictionary;
@@ -58,6 +55,9 @@ import org.openpdf.text.pdf.PdfObject;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.PdfStream;
 import org.openpdf.text.pdf.PdfString;
+import org.openpdf.text.pdf.PRIndirectReference;
+import org.openpdf.text.pdf.PRStream;
+import org.openpdf.text.pdf.PRTokeniser;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -72,37 +72,36 @@ import java.util.Stack;
  * @author dgd
  */
 @SuppressWarnings({"WeakerAccess", "unused"})
-public class PdfContentStreamHandler {
+public abstract class PdfContentStreamHandler {
 
-    private final Stack<List<TextAssemblyBuffer>> textFragmentStreams = new Stack<>();
-    private final Stack<String> contextNames = new Stack<>();
+    protected final Stack<List<TextAssemblyBuffer>> textFragmentStreams = new Stack<>();
+    protected final Stack<String> contextNames = new Stack<>();
     /**
      * detail parser for text within a marked section. used by TextAssembler
      */
-    private final TextAssembler renderListener;
+    protected final TextAssembler renderListener;
     /**
      * A map with all supported operators operators (PDF syntax).
+     * Protected to allow subclasses to override installDefaultOperators() and register additional operators.
      */
-    private Map<String, ContentOperator> operators;
+    protected Map<String, ContentOperator> operators;
     /**
      * Stack keeping track of the graphics state.
      */
-    private Stack<GraphicsState> gsStack;
+    protected Stack<GraphicsState> gsStack;
     /**
      * Text matrix.
      */
-    private Matrix textMatrix;
+    protected Matrix textMatrix;
     /**
      * Text line matrix.
      */
-    private Matrix textLineMatrix;
-    private List<TextAssemblyBuffer> textFragments = new ArrayList<>();
+    protected Matrix textLineMatrix;
+    protected List<TextAssemblyBuffer> textFragments = new ArrayList<>();
 
 
     public PdfContentStreamHandler(TextAssembler renderListener) {
         this.renderListener = renderListener;
-        installDefaultOperators();
-        reset();
     }
 
     private static Matrix getMatrix(List<PdfObject> operands) {
@@ -134,51 +133,51 @@ public class PdfContentStreamHandler {
 
     /**
      * Loads all the supported graphics and text state operators in a map.
+     * Subclasses can override this method to register additional operators.
+     * When overriding, subclasses should call super.installDefaultOperators() first.
      */
     protected void installDefaultOperators() {
         operators = new HashMap<>();
 
-        registerContentOperator(new PdfContentStreamHandler.PushGraphicsState());
-        registerContentOperator(new PdfContentStreamHandler.PopGraphicsState());
-        registerContentOperator(new PdfContentStreamHandler.ModifyCurrentTransformationMatrix());
-        registerContentOperator(new PdfContentStreamHandler.ProcessGraphicsStateResource());
+        registerContentOperator(new PushGraphicsState());
+        registerContentOperator(new PopGraphicsState());
+        registerContentOperator(new ModifyCurrentTransformationMatrix());
+        registerContentOperator(new ProcessGraphicsStateResource());
 
-        PdfContentStreamHandler.SetTextCharacterSpacing tcOperator = new PdfContentStreamHandler.SetTextCharacterSpacing();
+        SetTextCharacterSpacing tcOperator = new SetTextCharacterSpacing();
         registerContentOperator(tcOperator);
-        PdfContentStreamHandler.SetTextWordSpacing twOperator = new PdfContentStreamHandler.SetTextWordSpacing();
+        SetTextWordSpacing twOperator = new SetTextWordSpacing();
         registerContentOperator(twOperator);
-        registerContentOperator(new PdfContentStreamHandler.SetTextHorizontalScaling());
-        PdfContentStreamHandler.SetTextLeading tlOperator = new PdfContentStreamHandler.SetTextLeading();
+        registerContentOperator(new SetTextHorizontalScaling());
+        SetTextLeading tlOperator = new SetTextLeading();
         registerContentOperator(tlOperator);
-        registerContentOperator(new PdfContentStreamHandler.SetTextFont());
-        registerContentOperator(new PdfContentStreamHandler.SetTextRenderMode());
-        registerContentOperator(new PdfContentStreamHandler.SetTextRise());
+        registerContentOperator(new SetTextFont());
+        registerContentOperator(new SetTextRenderMode());
+        registerContentOperator(new SetTextRise());
 
-        registerContentOperator(new PdfContentStreamHandler.BeginText());
-        registerContentOperator(new PdfContentStreamHandler.EndText());
+        registerContentOperator(new BeginText());
+        registerContentOperator(new EndText());
 
-        PdfContentStreamHandler.TextMoveStartNextLine tdOperator = new PdfContentStreamHandler.TextMoveStartNextLine();
+        TextMoveStartNextLine tdOperator = new TextMoveStartNextLine();
         registerContentOperator(tdOperator);
-        registerContentOperator(new PdfContentStreamHandler.TextMoveStartNextLineWithLeading(tdOperator, tlOperator));
-        registerContentOperator(new PdfContentStreamHandler.TextSetTextMatrix());
-        PdfContentStreamHandler.TextMoveNextLine tstarOperator =
-                new PdfContentStreamHandler.TextMoveNextLine(tdOperator);
+        registerContentOperator(new TextMoveStartNextLineWithLeading(tdOperator, tlOperator));
+        registerContentOperator(new TextSetTextMatrix());
+        TextMoveNextLine tstarOperator =
+                new TextMoveNextLine(tdOperator);
         registerContentOperator(tstarOperator);
 
-        PdfContentStreamHandler.ShowText tjOperator = new PdfContentStreamHandler.ShowText();
-        registerContentOperator(new PdfContentStreamHandler.ShowText());
-        PdfContentStreamHandler.MoveNextLineAndShowText tickOperator =
-                new PdfContentStreamHandler.MoveNextLineAndShowText(tstarOperator, tjOperator);
+        ShowText tjOperator = new ShowText();
+        registerContentOperator(new ShowText());
+        MoveNextLineAndShowText tickOperator =
+                new MoveNextLineAndShowText(tstarOperator, tjOperator);
         registerContentOperator(tickOperator);
         registerContentOperator(
-                new PdfContentStreamHandler.MoveNextLineAndShowTextWithSpacing(twOperator, tcOperator, tickOperator));
-        registerContentOperator(new PdfContentStreamHandler.ShowTextArray());
-        // marked sections
+                new MoveNextLineAndShowTextWithSpacing(twOperator, tcOperator, tickOperator));
+        registerContentOperator(new ShowTextArray());
+
         registerContentOperator(new BeginMarked());
         registerContentOperator(new BeginMarkedDict());
         registerContentOperator(new EndMarked());
-
-        registerContentOperator(new Do());
     }
 
     /**
@@ -187,7 +186,7 @@ public class PdfContentStreamHandler {
      * @param operatorName name of the operator that we might need to call
      * @return the operator or null if none present
      */
-    public Optional<ContentOperator> lookupOperator(String operatorName) {
+    protected Optional<ContentOperator> lookupOperator(String operatorName) {
         return Optional.ofNullable(operators.get(operatorName));
     }
 
@@ -204,28 +203,9 @@ public class PdfContentStreamHandler {
                 .ifPresent(contentOperator -> contentOperator.invoke(operands, this, resources));
     }
 
-    void popContext() {
-        String contextName = contextNames.pop();
-        List<TextAssemblyBuffer> newBuffer = textFragmentStreams.pop();
-        // put together set of unparsed text fragments
-        renderListener.reset();
-        for (TextAssemblyBuffer fragment : textFragments) {
-            fragment.accumulate(renderListener, contextName);
-        }
-        FinalText contextResult = renderListener.endParsingContext(contextName);
-        Optional.ofNullable(contextResult)
-                .map(FinalText::getText)
-                .filter(text -> !text.isEmpty())
-                .ifPresent(text -> newBuffer.add(contextResult));
+    abstract void popContext();
 
-        textFragments = newBuffer;
-    }
-
-    void pushContext(String newContextName) {
-        contextNames.push(newContextName);
-        textFragmentStreams.push(textFragments);
-        textFragments = new ArrayList<>();
-    }
+    abstract void pushContext(String newContextName);
 
     /**
      * Returns the current graphics state.
@@ -236,14 +216,7 @@ public class PdfContentStreamHandler {
         return gsStack.peek();
     }
 
-    public void reset() {
-        if (gsStack == null || gsStack.isEmpty()) {
-            gsStack = new Stack<>();
-        }
-        gsStack.add(new GraphicsState());
-        textMatrix = null;
-        textLineMatrix = null;
-    }
+    public abstract void reset();
 
     /**
      * Returns the current text matrix.
@@ -287,28 +260,12 @@ public class PdfContentStreamHandler {
      *
      * @param string the text to display
      */
-    void displayPdfString(PdfString string) {
-        ParsedText renderInfo = new ParsedText(string, graphicsState(), textMatrix);
-        if (contextNames.peek() != null) {
-            textFragments.add(renderInfo);
-        }
-        textMatrix = new Matrix(renderInfo.getUnscaledTextWidth(graphicsState()), 0)
-                .multiply(textMatrix);
-    }
+    abstract void displayPdfString(PdfString string);
 
     /**
      * @return result text
      */
-    public String getResultantText() {
-        if (contextNames.size() > 0) {
-            throw new RuntimeException("can't get text with unprocessed stack items");
-        }
-        StringBuilder res = new StringBuilder();
-        for (TextAssemblyBuffer fragment : textFragments) {
-            res.append(fragment.getText());
-        }
-        return res.toString().trim();
-    }
+    public abstract String getResultantText();
 
     /**
      * A content operator implementation (TJ).
@@ -316,7 +273,7 @@ public class PdfContentStreamHandler {
     static class ShowTextArray implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -344,7 +301,7 @@ public class PdfContentStreamHandler {
     static class BeginText implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -364,7 +321,7 @@ public class PdfContentStreamHandler {
     static class EndText implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -384,7 +341,7 @@ public class PdfContentStreamHandler {
     static class ModifyCurrentTransformationMatrix implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -404,18 +361,18 @@ public class PdfContentStreamHandler {
      */
     static class MoveNextLineAndShowText implements ContentOperator {
 
-        private final PdfContentStreamHandler.TextMoveNextLine textMoveNextLine;
-        private final PdfContentStreamHandler.ShowText showText;
+        private final TextMoveNextLine textMoveNextLine;
+        private final ShowText showText;
 
         public MoveNextLineAndShowText(
-                PdfContentStreamHandler.TextMoveNextLine textMoveNextLine,
-                PdfContentStreamHandler.ShowText showText) {
+                TextMoveNextLine textMoveNextLine,
+                ShowText showText) {
             this.textMoveNextLine = textMoveNextLine;
             this.showText = showText;
         }
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -434,13 +391,13 @@ public class PdfContentStreamHandler {
      */
     static class MoveNextLineAndShowTextWithSpacing implements ContentOperator {
 
-        private final PdfContentStreamHandler.SetTextWordSpacing setTextWordSpacing;
-        private final PdfContentStreamHandler.SetTextCharacterSpacing setTextCharacterSpacing;
+        private final SetTextWordSpacing setTextWordSpacing;
+        private final SetTextCharacterSpacing setTextCharacterSpacing;
         private final MoveNextLineAndShowText moveNextLineAndShowText;
 
         public MoveNextLineAndShowTextWithSpacing(
-                PdfContentStreamHandler.SetTextWordSpacing setTextWordSpacing,
-                PdfContentStreamHandler.SetTextCharacterSpacing setTextCharacterSpacing,
+                SetTextWordSpacing setTextWordSpacing,
+                SetTextCharacterSpacing setTextCharacterSpacing,
                 MoveNextLineAndShowText moveNextLineAndShowText) {
             this.setTextWordSpacing = setTextWordSpacing;
             this.setTextCharacterSpacing = setTextCharacterSpacing;
@@ -448,7 +405,7 @@ public class PdfContentStreamHandler {
         }
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -481,7 +438,7 @@ public class PdfContentStreamHandler {
     static class PopGraphicsState implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -500,7 +457,7 @@ public class PdfContentStreamHandler {
     static class ProcessGraphicsStateResource implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -543,7 +500,7 @@ public class PdfContentStreamHandler {
     static class PushGraphicsState implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -564,7 +521,7 @@ public class PdfContentStreamHandler {
     static class SetTextCharacterSpacing implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -584,7 +541,7 @@ public class PdfContentStreamHandler {
     static class SetTextFont implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -611,7 +568,7 @@ public class PdfContentStreamHandler {
     static class TextSetTextMatrix implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -630,19 +587,19 @@ public class PdfContentStreamHandler {
      */
     static class TextMoveStartNextLineWithLeading implements ContentOperator {
 
-        private final PdfContentStreamHandler.TextMoveStartNextLine moveStartNextLine;
+        private final TextMoveStartNextLine moveStartNextLine;
 
-        private final PdfContentStreamHandler.SetTextLeading setTextLeading;
+        private final SetTextLeading setTextLeading;
 
         public TextMoveStartNextLineWithLeading(
-                PdfContentStreamHandler.TextMoveStartNextLine moveStartNextLine,
-                PdfContentStreamHandler.SetTextLeading setTextLeading) {
+                TextMoveStartNextLine moveStartNextLine,
+                SetTextLeading setTextLeading) {
             this.moveStartNextLine = moveStartNextLine;
             this.setTextLeading = setTextLeading;
         }
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -666,7 +623,7 @@ public class PdfContentStreamHandler {
     static class ShowText implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -692,7 +649,7 @@ public class PdfContentStreamHandler {
         }
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -714,7 +671,7 @@ public class PdfContentStreamHandler {
     static class TextMoveStartNextLine implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -738,7 +695,7 @@ public class PdfContentStreamHandler {
     static class SetTextRenderMode implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -758,7 +715,7 @@ public class PdfContentStreamHandler {
     static class SetTextRise implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -778,7 +735,7 @@ public class PdfContentStreamHandler {
     static class SetTextLeading implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -798,7 +755,7 @@ public class PdfContentStreamHandler {
     static class SetTextHorizontalScaling implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -818,7 +775,7 @@ public class PdfContentStreamHandler {
     static class SetTextWordSpacing implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -838,7 +795,7 @@ public class PdfContentStreamHandler {
     private static class BeginMarked implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -886,7 +843,7 @@ public class PdfContentStreamHandler {
         }
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -930,7 +887,7 @@ public class PdfContentStreamHandler {
     private static class EndMarked implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -943,10 +900,69 @@ public class PdfContentStreamHandler {
         }
     }
 
-    private class Do implements ContentOperator {
+    /**
+     * Processes PDF content stream bytes.
+     *
+     * @param contentBytes the bytes of a content stream
+     * @param resources    the resources that come with the content stream
+     */
+    protected void processContent(byte[] contentBytes, PdfDictionary resources) {
+        try {
+            PdfContentParser pdfContentParser = new PdfContentParser(new PRTokeniser(contentBytes));
+            List<PdfObject> operands = new ArrayList<>();
+            while (!pdfContentParser.parse(operands).isEmpty()) {
+                PdfLiteral operator = (PdfLiteral) operands.getLast();
+                invokeOperator(operator, operands, resources);
+            }
+        } catch (Exception e) {
+            throw new ExceptionConverter(e);
+        }
+    }
+
+    /**
+     * Gets the content bytes from a PdfObject, which may be a reference, a stream or an array.
+     * This is a utility method that can be used by subclasses and other classes in this package.
+     *
+     * @param object the object to read bytes from
+     * @return the content bytes
+     * @throws java.io.IOException if there's an error reading the content
+     */
+    protected byte[] getContentBytesFromPdfObject(PdfObject object) throws java.io.IOException {
+        return getContentBytesFromPdfObjectStatic(object);
+    }
+
+    /**
+     * Gets the content bytes from a PdfObject, which may be a reference, a stream or an array.
+     * This is a static utility method that can be used by any class in this package.
+     *
+     * @param object the object to read bytes from
+     * @return the content bytes
+     * @throws IOException if there's an error reading the content
+     */
+    static byte[] getContentBytesFromPdfObjectStatic(PdfObject object) throws IOException {
+        switch (object.type()) {
+            case PdfObject.INDIRECT:
+                return getContentBytesFromPdfObjectStatic(PdfReader.getPdfObject(object));
+            case PdfObject.STREAM:
+                return PdfReader.getStreamBytes((PRStream) PdfReader.getPdfObject(object));
+            case PdfObject.ARRAY:
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                for (PdfObject element : ((PdfArray) object).getElements()) {
+                    baos.write(getContentBytesFromPdfObjectStatic(element));
+                }
+                return baos.toByteArray();
+            default:
+                throw new IllegalStateException("Unsupported type: " + object.getClass().getCanonicalName());
+        }
+    }
+
+    /**
+     * A content operator implementation (Do) for handling XObject forms.
+     */
+    protected class Do implements ContentOperator {
 
         /**
-         * @see org.openpdf.text.pdf.parser.ContentOperator#getOperatorName()
+         * @see ContentOperator#getOperatorName()
          */
         @Override
         public String getOperatorName() {
@@ -955,7 +971,7 @@ public class PdfContentStreamHandler {
 
         @Override
         public void invoke(List<PdfObject> operands, PdfContentStreamHandler handler, PdfDictionary resources) {
-            PdfObject firstOperand = operands.get(0);
+            PdfObject firstOperand = operands.getFirst();
             if (firstOperand instanceof PdfName) {
                 PdfName name = (PdfName) firstOperand;
                 PdfDictionary dictionary = resources.getAsDict(PdfName.XOBJECT);
@@ -966,52 +982,20 @@ public class PdfContentStreamHandler {
                 PdfName subType = stream.getAsName(PdfName.SUBTYPE);
                 if (PdfName.FORM.equals(subType)) {
                     PdfDictionary resources2 = stream.getAsDict(PdfName.RESOURCES);
-                    if (resources2 == null)  {
+                    if (resources2 == null) {
                         resources2 = resources;
                     }
 
                     byte[] data;
                     try {
-                        data = getContentBytesFromPdfObject(stream);
+                        data = handler.getContentBytesFromPdfObject(stream);
                     } catch (IOException ex) {
                         throw new ExceptionConverter(ex);
                     }
                     new PushGraphicsState().invoke(operands, handler, resources);
-                    processContent(data, resources2);
+                    handler.processContent(data, resources2);
                     new PopGraphicsState().invoke(operands, handler, resources);
                 }
-            }
-
-        }
-
-        private void processContent(byte[] contentBytes, PdfDictionary resources) {
-            try {
-                PdfContentParser pdfContentParser = new PdfContentParser(new PRTokeniser(contentBytes));
-                List<PdfObject> operands = new ArrayList<>();
-                while (!pdfContentParser.parse(operands).isEmpty()) {
-                    PdfLiteral operator = (PdfLiteral) operands.get(operands.size() - 1);
-                    invokeOperator(operator, operands, resources);
-                }
-            } catch (Exception e) {
-                throw new ExceptionConverter(e);
-            }
-        }
-
-
-        private byte[] getContentBytesFromPdfObject(PdfObject object) throws IOException {
-            switch (object.type()) {
-                case PdfObject.INDIRECT:
-                    return getContentBytesFromPdfObject(PdfReader.getPdfObject(object));
-                case PdfObject.STREAM:
-                    return PdfReader.getStreamBytes((PRStream) PdfReader.getPdfObject(object));
-                case PdfObject.ARRAY:
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    for (PdfObject element : ((PdfArray) object).getElements()) {
-                        baos.write(getContentBytesFromPdfObject(element));
-                    }
-                    return baos.toByteArray();
-                default:
-                    throw new IllegalStateException("Unsupported type: " + object.getClass().getCanonicalName());
             }
         }
     }

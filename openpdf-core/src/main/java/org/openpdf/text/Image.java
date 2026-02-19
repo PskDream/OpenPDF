@@ -61,12 +61,15 @@ import org.openpdf.text.pdf.PdfOCG;
 import org.openpdf.text.pdf.PdfObject;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.PdfStream;
+import org.openpdf.text.pdf.PdfString;
 import org.openpdf.text.pdf.PdfTemplate;
 import org.openpdf.text.pdf.PdfWriter;
 import org.openpdf.text.pdf.codec.CCITTG4Encoder;
 import java.awt.Graphics2D;
 import java.awt.color.ICC_Profile;
 import java.awt.image.BufferedImage;
+import java.awt.image.IndexColorModel;
+import java.awt.image.WritableRaster;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -108,32 +111,58 @@ public abstract class Image extends Rectangle {
     private static final Pattern imageDataPattern = Pattern.compile("data:(image\\/[a-zA-Z0-9+-]+);.*(base64),(.*)");
 
     /**
-     * this is a kind of image alignment.
+     * Image alignment: Default alignment (same as LEFT).
+     * The image will be placed on the left side of the page.
      */
     public static final int DEFAULT = 0;
 
     /**
-     * this is a kind of image alignment.
+     * Image alignment: Right-align the image.
+     * The image will be placed on the right side of the page.
+     * Can be combined with TEXTWRAP or UNDERLYING using bitwise OR.
+     * Example: {@code image.setAlignment(Image.RIGHT | Image.TEXTWRAP);}
      */
     public static final int RIGHT = 2;
 
     /**
-     * this is a kind of image alignment.
+     * Image alignment: Left-align the image.
+     * The image will be placed on the left side of the page.
+     * Can be combined with TEXTWRAP or UNDERLYING using bitwise OR.
+     * Example: {@code image.setAlignment(Image.LEFT | Image.TEXTWRAP);}
      */
     public static final int LEFT = 0;
 
     /**
-     * this is a kind of image alignment.
+     * Image alignment: Center the image horizontally on the page.
+     * The image will be placed in the middle of the page width.
      */
     public static final int MIDDLE = 1;
 
     /**
-     * this is a kind of image alignment.
+     * Image alignment modifier: Allow text to wrap around the image.
+     * When combined with LEFT or RIGHT, text will flow around the image on the opposite side.
+     * This is useful for creating inline images where text continues alongside the image
+     * instead of the image occupying its own line.
+     * <p>
+     * Example for an image with text wrapping on the right:
+     * {@code image.setAlignment(Image.LEFT | Image.TEXTWRAP);}
+     * <p>
+     * Example for an image with text wrapping on the left:
+     * {@code image.setAlignment(Image.RIGHT | Image.TEXTWRAP);}
      */
     public static final int TEXTWRAP = 4;
 
     /**
-     * this is a kind of image alignment.
+     * Image alignment modifier: Place the image behind (underneath) the text.
+     * When combined with other alignment flags, the image will be rendered as a background
+     * element with text overlaying it. This is useful for watermarks, seals, or stamps
+     * that should appear behind text content.
+     * <p>
+     * Example for a background image on the left:
+     * {@code image.setAlignment(Image.LEFT | Image.UNDERLYING);}
+     * <p>
+     * Example for a seal that appears behind text:
+     * {@code image.setAlignment(Image.RIGHT | Image.UNDERLYING);}
      */
     public static final int UNDERLYING = 8;
 
@@ -798,6 +827,71 @@ public abstract class Image extends Rectangle {
             if (bi.getType() == BufferedImage.TYPE_BYTE_BINARY && bi.getColorModel().getNumColorComponents() <= 2) {
                 forceBW = true;
             }
+            
+            // Handle indexed color images
+            if (bi.getColorModel() instanceof IndexColorModel && !forceBW) {
+                IndexColorModel icm = (IndexColorModel) bi.getColorModel();
+                int mapSize = icm.getMapSize();
+                int bitsPerPixel = icm.getPixelSize();
+                
+                // Ensure bits per pixel is valid (1, 2, 4, or 8)
+                // For PDF indexed images, bpc should be the bits needed to index the palette
+                if (bitsPerPixel > 8 || bitsPerPixel == 0) {
+                    bitsPerPixel = 8;
+                } else if (bitsPerPixel > 4) {
+                    bitsPerPixel = 8;
+                } else if (bitsPerPixel > 2) {
+                    bitsPerPixel = 4;
+                } else if (bitsPerPixel > 1) {
+                    bitsPerPixel = 2;
+                } else {
+                    bitsPerPixel = 1;
+                }
+                
+                // Extract palette data
+                byte[] reds = new byte[mapSize];
+                byte[] greens = new byte[mapSize];
+                byte[] blues = new byte[mapSize];
+                icm.getReds(reds);
+                icm.getGreens(greens);
+                icm.getBlues(blues);
+                
+                // Build palette as RGB byte array
+                byte[] palette = new byte[mapSize * 3];
+                for (int i = 0; i < mapSize; i++) {
+                    palette[i * 3] = reds[i];
+                    palette[i * 3 + 1] = greens[i];
+                    palette[i * 3 + 2] = blues[i];
+                }
+                
+                // Extract pixel indices
+                int width = bi.getWidth();
+                int height = bi.getHeight();
+                byte[] pixelData = new byte[width * height];
+                
+                WritableRaster raster = bi.getRaster();
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        pixelData[y * width + x] = (byte) raster.getSample(x, y, 0);
+                    }
+                }
+                
+                // Create indexed image with palette
+                Image img = Image.getInstance(width, height, 1, bitsPerPixel, pixelData);
+                
+                // Set up indexed colorspace: [/Indexed /DeviceRGB maxIndex palette]
+                PdfArray indexed = new PdfArray();
+                indexed.add(PdfName.INDEXED);
+                indexed.add(PdfName.DEVICERGB);
+                indexed.add(new PdfNumber(mapSize - 1));
+                indexed.add(new PdfString(palette));
+                
+                PdfDictionary additional = new PdfDictionary();
+                additional.put(PdfName.COLORSPACE, indexed);
+                img.setAdditional(additional);
+                
+                return img;
+            }
         }
 
         java.awt.image.PixelGrabber pg = new java.awt.image.PixelGrabber(image,
@@ -1221,8 +1315,17 @@ public abstract class Image extends Rectangle {
 
     /**
      * Gets the alignment for the image.
+     * <p>
+     * The returned value may be a combination of alignment flags combined using bitwise OR.
+     * Use bitwise AND (&amp;) to check for specific flags:
+     * <pre>{@code
+     * int alignment = image.getAlignment();
+     * boolean hasTextwrap = (alignment & Image.TEXTWRAP) != 0;
+     * boolean isUnderlying = (alignment & Image.UNDERLYING) != 0;
+     * }</pre>
      *
-     * @return a value
+     * @return the alignment value (possibly a combination of flags)
+     * @see #setAlignment(int)
      */
     public int getAlignment() {
         return alignment;
@@ -1230,8 +1333,36 @@ public abstract class Image extends Rectangle {
 
     /**
      * Sets the alignment for the image.
+     * <p>
+     * The alignment parameter can be one of the following base values:
+     * <ul>
+     *   <li>{@link #LEFT} or {@link #DEFAULT} - Align the image to the left</li>
+     *   <li>{@link #RIGHT} - Align the image to the right</li>
+     *   <li>{@link #MIDDLE} - Center the image horizontally</li>
+     * </ul>
+     * <p>
+     * The base alignment can be combined with modifiers using bitwise OR (|):
+     * <ul>
+     *   <li>{@link #TEXTWRAP} - Allow text to wrap around the image (useful for inline images)</li>
+     *   <li>{@link #UNDERLYING} - Place the image behind text (useful for watermarks, seals, stamps)</li>
+     * </ul>
+     * <p>
+     * Examples:
+     * <pre>{@code
+     * // Image aligned left with text wrapping around it on the right
+     * image.setAlignment(Image.LEFT | Image.TEXTWRAP);
+     * 
+     * // Image aligned right with text wrapping around it on the left
+     * image.setAlignment(Image.RIGHT | Image.TEXTWRAP);
+     * 
+     * // Seal or stamp that appears behind text on the right
+     * image.setAlignment(Image.RIGHT | Image.UNDERLYING);
+     * 
+     * // Watermark that appears behind centered text
+     * image.setAlignment(Image.MIDDLE | Image.UNDERLYING);
+     * }</pre>
      *
-     * @param alignment the alignment
+     * @param alignment the alignment value (can be a combination of flags using bitwise OR)
      */
 
     public void setAlignment(int alignment) {
